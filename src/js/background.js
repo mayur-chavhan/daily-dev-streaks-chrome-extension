@@ -80,17 +80,19 @@ function clickArticleAndUpdateStreak(tabId) {
         target: { tabId: tabId },
         function: clickFirstArticle,
       },
-      (results) => {
+      () => {
         if (chrome.runtime.lastError) {
           console.error("Error executing script:", chrome.runtime.lastError);
           return;
         }
 
-        // Check if click was successful
-        if (results && results[0] && results[0].result === true) {
-          // After clicking, update streak information
+        console.log("Article click script executed successfully");
+
+        // Since the actual click happens after a timeout in the injected script,
+        // we'll wait a bit longer before updating the streak
+        setTimeout(() => {
           updateStreak();
-        }
+        }, ARTICLE_LOAD_DELAY_MS + 1000); // Wait a bit longer than the delay in clickFirstArticle
       }
     );
   } catch (error) {
@@ -104,31 +106,33 @@ function clickArticleAndUpdateStreak(tabId) {
  */
 function clickFirstArticle() {
   // Wait for content to load completely
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      try {
-        // Find and click on the first post
-        const posts = document.querySelectorAll("article");
-        if (posts.length > 0) {
-          const link = posts[0].querySelector("a");
-          if (link) {
-            link.click();
-            console.log("Clicked on post to maintain streak");
-            resolve(true);
-          } else {
-            console.error("No link found in the first article");
-            resolve(false);
-          }
+  setTimeout(() => {
+    try {
+      // Find and click on the first post
+      const posts = document.querySelectorAll("article");
+      if (posts.length > 0) {
+        const link = posts[0].querySelector("a");
+        if (link) {
+          link.click();
+          console.log("Clicked on post to maintain streak");
+          return true;
         } else {
-          console.error("No articles found on the page");
-          resolve(false);
+          console.error("No link found in the first article");
+          return false;
         }
-      } catch (error) {
-        console.error("Error clicking article:", error);
-        resolve(false);
+      } else {
+        console.error("No articles found on the page");
+        return false;
       }
-    }, ARTICLE_LOAD_DELAY_MS);
-  });
+    } catch (error) {
+      console.error("Error clicking article:", error);
+      return false;
+    }
+  }, ARTICLE_LOAD_DELAY_MS);
+
+  // Return true to indicate the script was executed
+  // The actual click will happen asynchronously after the timeout
+  return true;
 }
 
 /**
