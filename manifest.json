@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Daily.dev Streak Keeper",
+  "version": "1.0",
+  "description": "Automatically maintains your daily.dev streak by clicking on articles and providing reminders",
+  "author": "Mayur Chavhan",
+  "permissions": ["storage", "alarms", "notifications", "scripting", "tabs"],
+  "host_permissions": ["https://app.daily.dev/*"],
+  "chrome_url_overrides": {
+    "newtab": "src/html/newtab.html"
+  },
+  "background": {
+    "service_worker": "src/js/background.js"
+  },
+  "action": {
+    "default_popup": "src/html/popup.html",
+    "default_icon": {
+      "16": "src/images/icon16.png",
+      "48": "src/images/icon48.png",
+      "128": "src/images/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "src/images/icon16.png",
+    "48": "src/images/icon48.png",
+    "128": "src/images/icon128.png"
+  }
+}

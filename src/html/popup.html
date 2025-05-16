@@ -1,0 +1,30 @@
+<!-- popup.html -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Daily.dev Streak Tracker</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="../css/styles.css" />
+  </head>
+  <body class="popup">
+    <div class="logo">
+      <img src="../images/icon48.png" alt="Daily.dev Streak Keeper" />
+    </div>
+    <h1>Daily.dev Streak</h1>
+    <div class="streak"><span id="streak-count">0</span> days</div>
+    <div class="status" id="status-message">Loading status...</div>
+    <div class="info">
+      <p>This extension automatically maintains your daily.dev streak by:</p>
+      <ul>
+        <li>Clicking on an article when you visit daily.dev</li>
+        <li>Sending a reminder at 11:00 PM if needed</li>
+        <li>
+          Automatically maintaining your streak at 11:15 PM if you haven't
+          visited
+        </li>
+      </ul>
+    </div>
+    <script src="../js/popup.js"></script>
+  </body>
+</html>

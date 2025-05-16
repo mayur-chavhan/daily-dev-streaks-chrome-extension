@@ -1,0 +1,117 @@
+/* Common styles for the extension */
+
+/* Popup styles */
+body.popup {
+  width: 300px;
+  padding: 15px;
+  font-family: Arial, sans-serif;
+  margin: 0;
+}
+
+.streak {
+  font-size: 28px;
+  text-align: center;
+  margin: 20px 0;
+}
+
+.status {
+  padding: 10px;
+  border-radius: 5px;
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.status-success {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-warning {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.info {
+  font-size: 12px;
+  color: #666;
+  margin-top: 15px;
+}
+
+.logo {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.logo img {
+  width: 40px;
+  height: 40px;
+}
+
+h1 {
+  text-align: center;
+  margin-top: 0;
+  color: #333;
+}
+
+/* Button styles */
+.btn {
+  display: inline-block;
+  padding: 8px 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  text-align: center;
+  text-decoration: none;
+  transition: background-color 0.3s;
+}
+
+.btn:hover {
+  background-color: #0056b3;
+}
+
+.btn-block {
+  display: block;
+  width: 100%;
+  margin: 10px 0;
+}
+
+/* Newtab styles */
+body.newtab {
+  font-family: Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  margin: 0;
+  background-color: #f5f5f5;
+}
+
+.newtab-container {
+  text-align: center;
+  max-width: 500px;
+  padding: 20px;
+}
+
+.newtab .logo img {
+  width: 80px;
+  height: 80px;
+}
+
+.spinner {
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border-left-color: #09f;
+  animation: spin 1s linear infinite;
+  margin: 20px auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
