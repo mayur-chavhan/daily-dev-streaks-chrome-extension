@@ -256,8 +256,8 @@ function updateStreak() {
               title: "Daily.dev Streak Maintained!",
               message:
                 streakStatus === "continued"
-                  ? `Great job! Your streak is now ${newStreak} days.`
-                  : "You've maintained your streak for today!",
+                  ? `Great job! Your streak is now ${newStreak} days. You won't receive any more reminders today.`
+                  : "You've maintained your streak for today! You won't receive any more reminders until tomorrow.",
               priority: 0,
             });
           }
@@ -293,6 +293,29 @@ function getNextReminderTime(hour = 23, minute = 0) {
     console.error("Error calculating reminder time:", error);
     // Return a default time (24 hours from now) in case of error
     return Date.now() + 24 * 60 * 60 * 1000;
+  }
+}
+
+/**
+ * Format a time in 24-hour format to a user-friendly string (e.g., "8:00 PM")
+ * @param {number} hour - Hour in 24-hour format
+ * @param {number} minute - Minute
+ * @returns {string} Formatted time string
+ */
+function formatTime(hour, minute) {
+  try {
+    const date = new Date();
+    date.setHours(hour, minute, 0, 0);
+
+    // Format the time as "h:mm A" (e.g., "8:00 PM")
+    return date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch (error) {
+    console.error("Error formatting time:", error);
+    return `${hour}:${minute < 10 ? "0" + minute : minute}`;
   }
 }
 
@@ -354,14 +377,28 @@ function checkStreakAndNotify(isUrgent = false) {
 
       // Only send notification if streak hasn't been maintained today
       if (!result.lastVisit || result.lastVisit !== today) {
+        // Get the next failsafe time based on which reminder this is
+        const nextFailsafeHour = isUrgent
+          ? SECOND_FAILSAFE_HOUR
+          : FIRST_FAILSAFE_HOUR;
+        const nextFailsafeMinute = isUrgent
+          ? SECOND_FAILSAFE_MINUTE
+          : FIRST_FAILSAFE_MINUTE;
+
+        // Format the time for display (e.g., "8:00 PM" or "10:15 PM")
+        const failsafeTimeString = formatTime(
+          nextFailsafeHour,
+          nextFailsafeMinute
+        );
+
         // Determine notification message based on urgency
         const title = isUrgent
           ? "URGENT: Daily.dev Streak About to Expire!"
           : "Daily.dev Streak Reminder";
 
         const message = isUrgent
-          ? "Your streak will expire soon! Open a new tab now to maintain your streak."
-          : "Don't forget to visit daily.dev today to maintain your streak!";
+          ? `Your streak will expire soon! The extension will automatically maintain your streak at ${failsafeTimeString} if you don't visit daily.dev before then.`
+          : `Don't forget to visit daily.dev today to maintain your streak! A failsafe will activate at ${failsafeTimeString} if needed.`;
 
         // Show reminder notification
         chrome.notifications.create(

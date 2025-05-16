@@ -72,52 +72,22 @@ function handleIncompleteStreak() {
 
 /**
  * Handle the case when the streak has already been maintained
+ * Simply redirect to daily.dev without showing intermediate page
  */
 function handleCompletedStreak() {
   try {
-    // Update the loading message
+    // Show a brief message about redirecting
     const loadingElement = document.getElementById("loading");
     if (loadingElement) {
-      loadingElement.textContent =
-        "You've already maintained your streak today!";
+      loadingElement.textContent = "Redirecting to daily.dev...";
     }
 
-    // Hide the spinner
-    const spinnerElement = document.querySelector(".spinner");
-    if (spinnerElement) {
-      spinnerElement.style.display = "none";
-    }
-
-    // Add a button to visit daily.dev anyway
-    addVisitButton();
+    // Redirect to daily.dev immediately
+    window.location.href = DAILY_DEV_URL;
   } catch (error) {
     console.error("Error handling completed streak:", error);
-    showError("Could not update the page");
+    showError("Could not redirect to daily.dev");
   }
-}
-
-/**
- * Add a button to visit daily.dev
- */
-function addVisitButton() {
-  const container = document.querySelector(".newtab-container");
-  if (!container) return;
-
-  const visitButton = document.createElement("button");
-  visitButton.textContent = "Visit daily.dev anyway";
-  visitButton.className = "btn";
-  visitButton.style.marginTop = "20px";
-
-  visitButton.addEventListener("click", () => {
-    try {
-      window.location.href = DAILY_DEV_URL;
-    } catch (error) {
-      console.error("Error navigating to daily.dev:", error);
-      showError("Could not navigate to daily.dev");
-    }
-  });
-
-  container.appendChild(visitButton);
 }
 
 /**
