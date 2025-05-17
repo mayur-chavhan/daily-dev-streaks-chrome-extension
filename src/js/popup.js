@@ -22,15 +22,18 @@ document.addEventListener("DOMContentLoaded", () => {
 function initializePopup() {
   try {
     // Get streak information from storage
-    chrome.storage.local.get(["streak", "lastVisit"], (result) => {
-      if (chrome.runtime.lastError) {
-        console.error("Error accessing storage:", chrome.runtime.lastError);
-        showError("Could not access streak information");
-        return;
-      }
+    chrome.storage.local.get(
+      ["streak", "lastVisit", "syncedWithDailyDev", "lastSyncTime"],
+      (result) => {
+        if (chrome.runtime.lastError) {
+          console.error("Error accessing storage:", chrome.runtime.lastError);
+          showError("Could not access streak information");
+          return;
+        }
 
-      updateStreakDisplay(result);
-    });
+        updateStreakDisplay(result);
+      }
+    );
   } catch (error) {
     console.error("Error initializing popup:", error);
     showError("An error occurred while loading the popup");
@@ -47,13 +50,50 @@ function updateStreakDisplay(streakData) {
     const streakCount = streakData.streak || 0;
     document.getElementById("streak-count").textContent = streakCount;
 
+    // Add sync status indicator if available
+    if (streakData.syncedWithDailyDev) {
+      const syncIndicator = document.createElement("span");
+      syncIndicator.className = "sync-indicator";
+      syncIndicator.title = "Synced with daily.dev";
+      syncIndicator.textContent = " ✓";
+      syncIndicator.style.color = "#4caf50";
+      syncIndicator.style.fontWeight = "bold";
+
+      const streakCountEl = document.getElementById("streak-count");
+      if (streakCountEl.nextSibling) {
+        streakCountEl.parentNode.insertBefore(
+          syncIndicator,
+          streakCountEl.nextSibling
+        );
+      } else {
+        streakCountEl.parentNode.appendChild(syncIndicator);
+      }
+
+      // Add last sync time if available
+      if (streakData.lastSyncTime) {
+        const syncTimeEl = document.createElement("div");
+        syncTimeEl.className = "sync-time";
+        syncTimeEl.style.fontSize = "10px";
+        syncTimeEl.style.color = "#666";
+        syncTimeEl.style.marginTop = "5px";
+
+        const syncDate = new Date(streakData.lastSyncTime);
+        syncTimeEl.textContent = `Last synced: ${syncDate.toLocaleString()}`;
+
+        const streakEl = document.querySelector(".streak");
+        if (streakEl) {
+          streakEl.appendChild(syncTimeEl);
+        }
+      }
+    }
+
     // Get today's date for comparison
     const today = new Date().toDateString();
     const statusEl = document.getElementById("status-message");
 
     // Check if streak has been maintained today
     if (streakData.lastVisit === today) {
-      updateStatusForCompletedStreak(statusEl);
+      updateStatusForCompletedStreak(statusEl, streakData.syncedWithDailyDev);
     } else {
       updateStatusForIncompleteStreak(statusEl);
     }
@@ -66,9 +106,12 @@ function updateStreakDisplay(streakData) {
 /**
  * Update the status message for a completed streak
  * @param {HTMLElement} statusElement - The status message element
+ * @param {boolean} isSynced - Whether the streak is synced with daily.dev
  */
-function updateStatusForCompletedStreak(statusElement) {
-  statusElement.textContent = "You've maintained your streak today!";
+function updateStatusForCompletedStreak(statusElement, isSynced) {
+  statusElement.textContent = isSynced
+    ? "You've maintained your streak today! (Synced with daily.dev)"
+    : "You've maintained your streak today!";
   statusElement.classList.add("status-success");
 }
 

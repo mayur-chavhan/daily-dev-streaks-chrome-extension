@@ -6,9 +6,6 @@
   "author": "Mayur Chavhan",
   "permissions": ["storage", "alarms", "notifications", "scripting", "tabs"],
   "host_permissions": ["https://app.daily.dev/*"],
-  "chrome_url_overrides": {
-    "newtab": "src/html/newtab.html"
-  },
   "background": {
     "service_worker": "src/js/background.js"
   },
