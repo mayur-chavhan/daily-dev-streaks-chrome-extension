@@ -27,6 +27,10 @@ const FIRST_FAILSAFE_MINUTE = 0;
 const SECOND_FAILSAFE_HOUR = 22; // 10:15 PM
 const SECOND_FAILSAFE_MINUTE = 15;
 
+// Force sync time (to ensure we have the latest streak count)
+const FORCE_SYNC_HOUR = 18; // 6:00 PM
+const FORCE_SYNC_MINUTE = 0;
+
 /**
  * Listen for tab updates to detect when daily.dev is loaded
  */
@@ -214,35 +218,88 @@ function clickFirstArticle() {
     // Function to extract streak count from the daily.dev UI
     function extractStreakCount(statusObj) {
       try {
+        // Log the DOM for debugging
+        console.log("Attempting to extract streak count from daily.dev UI");
+
+        // Force a refresh of the streak data by checking all possible locations
+        // First, try to find the streak element in the popup UI
+        let streakElement = null;
+
         // Try to find the streak element by ID first
-        let streakElement = document.getElementById(
-          "reading-streak-header-button"
-        );
+        streakElement = document.getElementById("reading-streak-header-button");
+        console.log("Streak element by ID:", streakElement);
 
-        // If not found by ID, try other selectors that might contain the streak count
-        if (!streakElement) {
-          const possibleSelectors = [
-            '[data-testid="reading-streak-header-button"]',
-            ".streak-counter",
-            '[aria-label*="streak"]',
-            '[title*="streak"]',
-          ];
+        // Try all possible selectors that might contain the streak count
+        const possibleSelectors = [
+          '[data-testid="reading-streak-header-button"]',
+          ".streak-counter",
+          '[aria-label*="streak"]',
+          '[title*="streak"]',
+          // Add more specific selectors based on the daily.dev UI
+          ".streak-count",
+          '[data-testid="streak-count"]',
+          ".streak-number",
+          // Look for elements containing the word "streak" in their text
+          'div:contains("streak")',
+          'span:contains("streak")',
+          'p:contains("streak")',
+        ];
 
-          for (const selector of possibleSelectors) {
-            const element = document.querySelector(selector);
-            if (element) {
-              streakElement = element;
-              break;
+        // Log all elements that match any of our selectors
+        console.log("Searching for streak elements with various selectors:");
+        for (const selector of possibleSelectors) {
+          try {
+            const elements = document.querySelectorAll(selector);
+            if (elements && elements.length > 0) {
+              console.log(
+                `Found ${elements.length} elements with selector: ${selector}`,
+                elements
+              );
+
+              // If we haven't found a streak element yet, use the first match
+              if (!streakElement && elements.length > 0) {
+                streakElement = elements[0];
+                console.log("Using element:", streakElement);
+              }
+
+              // Check each element for a number
+              for (const el of elements) {
+                const text = el.textContent || el.innerText;
+                console.log(`Element text: "${text}"`);
+
+                // Look for numbers in the text
+                const matches = text.match(/\d+/g);
+                if (matches && matches.length > 0) {
+                  console.log("Found numbers in text:", matches);
+
+                  // If the text contains "streak" and a number, this is likely our streak count
+                  if (text.toLowerCase().includes("streak")) {
+                    statusObj.streakCount = parseInt(matches[0], 10);
+                    console.log(
+                      "Extracted streak count from text containing 'streak':",
+                      statusObj.streakCount
+                    );
+                    return; // We found what we're looking for
+                  }
+                }
+              }
             }
+          } catch (selectorError) {
+            console.error(`Error with selector ${selector}:`, selectorError);
           }
         }
 
+        // If we found a streak element but haven't extracted a number yet, try harder
         if (streakElement) {
           // Try to extract the number from the element
           const text = streakElement.textContent || streakElement.innerText;
-          const matches = text.match(/\d+/);
+          console.log(`Streak element text: "${text}"`);
+
+          // Look for all numbers in the text
+          const matches = text.match(/\d+/g);
 
           if (matches && matches.length > 0) {
+            // Use the first number found
             statusObj.streakCount = parseInt(matches[0], 10);
             console.log("Extracted streak count:", statusObj.streakCount);
           } else {
@@ -250,8 +307,11 @@ function clickFirstArticle() {
             const ariaLabel = streakElement.getAttribute("aria-label");
             const title = streakElement.getAttribute("title");
 
+            console.log("Aria label:", ariaLabel);
+            console.log("Title:", title);
+
             if (ariaLabel) {
-              const ariaMatches = ariaLabel.match(/\d+/);
+              const ariaMatches = ariaLabel.match(/\d+/g);
               if (ariaMatches && ariaMatches.length > 0) {
                 statusObj.streakCount = parseInt(ariaMatches[0], 10);
                 console.log(
@@ -260,13 +320,47 @@ function clickFirstArticle() {
                 );
               }
             } else if (title) {
-              const titleMatches = title.match(/\d+/);
+              const titleMatches = title.match(/\d+/g);
               if (titleMatches && titleMatches.length > 0) {
                 statusObj.streakCount = parseInt(titleMatches[0], 10);
                 console.log(
                   "Extracted streak count from title:",
                   statusObj.streakCount
                 );
+              }
+            }
+          }
+        }
+
+        // If we still don't have a streak count, try a more aggressive approach
+        if (!statusObj.streakCount) {
+          console.log(
+            "No streak count found yet, trying more aggressive approach"
+          );
+
+          // Get all elements in the document
+          const allElements = document.querySelectorAll("*");
+
+          // Look for elements that might contain streak information
+          for (const el of allElements) {
+            const text = el.textContent || el.innerText;
+
+            // If the text is short and contains a number and the word "streak", it's likely our streak count
+            if (
+              text &&
+              text.length < 50 &&
+              text.toLowerCase().includes("streak")
+            ) {
+              console.log(`Potential streak element: "${text}"`);
+
+              const matches = text.match(/\d+/g);
+              if (matches && matches.length > 0) {
+                statusObj.streakCount = parseInt(matches[0], 10);
+                console.log(
+                  "Extracted streak count from general search:",
+                  statusObj.streakCount
+                );
+                break;
               }
             }
           }
@@ -392,6 +486,144 @@ function clickFirstArticle() {
 }
 
 /**
+ * Listen for messages from the popup
+ */
+chrome.runtime.onMessage.addListener((message, _, sendResponse) => {
+  if (message.action === "forceSyncStreak") {
+    console.log("Received request to force sync streak");
+
+    // Call the force sync function
+    try {
+      // Create a new tab with daily.dev
+      chrome.tabs.create({ url: DAILY_DEV_URL, active: false }, (tab) => {
+        if (chrome.runtime.lastError) {
+          console.error("Error creating tab:", chrome.runtime.lastError);
+          sendResponse({ success: false, error: "Could not create tab" });
+          return;
+        }
+
+        console.log(
+          "Opened daily.dev tab in background for manual streak sync"
+        );
+
+        // Set up a listener to wait for the tab to fully load
+        const tabLoadListener = (tabId, changeInfo, _) => {
+          // Only proceed if this is our tab and it's fully loaded
+          if (tabId === tab.id && changeInfo.status === "complete") {
+            console.log("Daily.dev page loaded for manual streak sync");
+
+            // Remove this listener as we don't need it anymore
+            chrome.tabs.onUpdated.removeListener(tabLoadListener);
+
+            // Wait a moment for the page to render before extracting the streak count
+            setTimeout(() => {
+              // Extract the streak count
+              chrome.scripting.executeScript(
+                {
+                  target: { tabId: tab.id },
+                  function: extractStreakCountFromPage,
+                },
+                (results) => {
+                  // Close the tab regardless of the result
+                  chrome.tabs.remove(tab.id, () => {
+                    console.log(
+                      "Closed daily.dev tab after manual streak sync attempt"
+                    );
+                  });
+
+                  if (chrome.runtime.lastError) {
+                    console.error(
+                      "Error executing streak extraction script:",
+                      chrome.runtime.lastError
+                    );
+                    sendResponse({
+                      success: false,
+                      error: "Script execution failed",
+                    });
+                    return;
+                  }
+
+                  if (
+                    results &&
+                    results[0] &&
+                    results[0].result &&
+                    !isNaN(results[0].result)
+                  ) {
+                    // Use the extracted streak count
+                    const streakCount = results[0].result;
+                    console.log(
+                      "Successfully extracted streak count from daily.dev:",
+                      streakCount
+                    );
+
+                    // Update the streak count in storage
+                    chrome.storage.local.set(
+                      {
+                        streak: streakCount,
+                        syncedWithDailyDev: true,
+                        lastSyncTime: Date.now(),
+                      },
+                      () => {
+                        if (chrome.runtime.lastError) {
+                          console.error(
+                            "Error updating storage:",
+                            chrome.runtime.lastError
+                          );
+                          sendResponse({
+                            success: false,
+                            error: "Storage update failed",
+                          });
+                          return;
+                        }
+
+                        console.log(
+                          "Updated streak count in storage:",
+                          streakCount
+                        );
+                        sendResponse({
+                          success: true,
+                          streakCount: streakCount,
+                        });
+                      }
+                    );
+                  } else {
+                    console.error(
+                      "Failed to extract streak count from daily.dev"
+                    );
+                    sendResponse({
+                      success: false,
+                      error: "Could not extract streak count",
+                    });
+                  }
+                }
+              );
+            }, 3000); // Wait 3 seconds for the page to fully render
+          }
+        };
+
+        // Add the listener
+        chrome.tabs.onUpdated.addListener(tabLoadListener);
+
+        // Set a timeout to remove the listener and close the tab if something goes wrong
+        setTimeout(() => {
+          chrome.tabs.onUpdated.removeListener(tabLoadListener);
+          chrome.tabs.remove(tab.id, () => {
+            console.log("Closed daily.dev tab after timeout");
+          });
+          sendResponse({ success: false, error: "Timeout" });
+        }, 30000); // 30 seconds timeout
+      });
+    } catch (error) {
+      console.error("Error handling manual sync request:", error);
+      sendResponse({ success: false, error: error.message });
+    }
+
+    // Return true to indicate that we will send a response asynchronously
+    return true;
+  }
+});
+
+/**
  * Initialize extension when installed
  */
 chrome.runtime.onInstalled.addListener(() => {
@@ -429,6 +661,12 @@ chrome.runtime.onInstalled.addListener(() => {
  */
 function setupAlarms() {
   try {
+    // Create alarm for force sync (6:00 PM)
+    chrome.alarms.create("forceStreakSync", {
+      periodInMinutes: DAILY_CHECK_MINUTES,
+      when: getNextReminderTime(FORCE_SYNC_HOUR, FORCE_SYNC_MINUTE),
+    });
+
     // Create alarms for streak reminders (7:00 PM and 10:00 PM)
     chrome.alarms.create("firstStreakReminder", {
       periodInMinutes: DAILY_CHECK_MINUTES,
@@ -463,48 +701,171 @@ function setupAlarms() {
  */
 function extractStreakCountFromPage() {
   try {
+    // Log the DOM for debugging
+    console.log("Attempting to extract streak count from article page");
+
+    // First, try to find the streak element in the popup UI
+    let streakElement = null;
+    let streakCount = null;
+
     // Try to find the streak element by ID first
-    let streakElement = document.getElementById("reading-streak-header-button");
+    streakElement = document.getElementById("reading-streak-header-button");
+    console.log("Streak element by ID:", streakElement);
 
-    // If not found by ID, try other selectors that might contain the streak count
-    if (!streakElement) {
-      const possibleSelectors = [
-        '[data-testid="reading-streak-header-button"]',
-        ".streak-counter",
-        '[aria-label*="streak"]',
-        '[title*="streak"]',
-      ];
+    // Try all possible selectors that might contain the streak count
+    const possibleSelectors = [
+      '[data-testid="reading-streak-header-button"]',
+      ".streak-counter",
+      '[aria-label*="streak"]',
+      '[title*="streak"]',
+      // Add more specific selectors based on the daily.dev UI
+      ".streak-count",
+      '[data-testid="streak-count"]',
+      ".streak-number",
+      // Look for elements containing the word "streak" in their text
+      'div:contains("streak")',
+      'span:contains("streak")',
+      'p:contains("streak")',
+    ];
 
-      for (const selector of possibleSelectors) {
-        const element = document.querySelector(selector);
-        if (element) {
-          streakElement = element;
-          break;
+    // Log all elements that match any of our selectors
+    console.log("Searching for streak elements with various selectors:");
+    for (const selector of possibleSelectors) {
+      try {
+        const elements = document.querySelectorAll(selector);
+        if (elements && elements.length > 0) {
+          console.log(
+            `Found ${elements.length} elements with selector: ${selector}`,
+            elements
+          );
+
+          // If we haven't found a streak element yet, use the first match
+          if (!streakElement && elements.length > 0) {
+            streakElement = elements[0];
+            console.log("Using element:", streakElement);
+          }
+
+          // Check each element for a number
+          for (const el of elements) {
+            const text = el.textContent || el.innerText;
+            console.log(`Element text: "${text}"`);
+
+            // Look for numbers in the text
+            const matches = text.match(/\d+/g);
+            if (matches && matches.length > 0) {
+              console.log("Found numbers in text:", matches);
+
+              // If the text contains "streak" and a number, this is likely our streak count
+              if (text.toLowerCase().includes("streak")) {
+                streakCount = parseInt(matches[0], 10);
+                console.log(
+                  "Extracted streak count from text containing 'streak':",
+                  streakCount
+                );
+                return streakCount; // We found what we're looking for
+              }
+            }
+          }
         }
+      } catch (selectorError) {
+        console.error(`Error with selector ${selector}:`, selectorError);
       }
     }
 
+    // If we found a streak element but haven't extracted a number yet, try harder
     if (streakElement) {
       // Try to extract the number from the element
       const text = streakElement.textContent || streakElement.innerText;
-      const matches = text.match(/\d+/);
+      console.log(`Streak element text: "${text}"`);
+
+      // Look for all numbers in the text
+      const matches = text.match(/\d+/g);
 
       if (matches && matches.length > 0) {
-        return parseInt(matches[0], 10);
+        // Use the first number found
+        streakCount = parseInt(matches[0], 10);
+        console.log("Extracted streak count:", streakCount);
+        return streakCount;
       } else {
         // If we found the element but couldn't extract a number, check for attributes
         const ariaLabel = streakElement.getAttribute("aria-label");
         const title = streakElement.getAttribute("title");
 
+        console.log("Aria label:", ariaLabel);
+        console.log("Title:", title);
+
         if (ariaLabel) {
-          const ariaMatches = ariaLabel.match(/\d+/);
+          const ariaMatches = ariaLabel.match(/\d+/g);
           if (ariaMatches && ariaMatches.length > 0) {
-            return parseInt(ariaMatches[0], 10);
+            streakCount = parseInt(ariaMatches[0], 10);
+            console.log("Extracted streak count from aria-label:", streakCount);
+            return streakCount;
           }
         } else if (title) {
-          const titleMatches = title.match(/\d+/);
+          const titleMatches = title.match(/\d+/g);
           if (titleMatches && titleMatches.length > 0) {
-            return parseInt(titleMatches[0], 10);
+            streakCount = parseInt(titleMatches[0], 10);
+            console.log("Extracted streak count from title:", streakCount);
+            return streakCount;
+          }
+        }
+      }
+    }
+
+    // If we still don't have a streak count, try a more aggressive approach
+    if (!streakCount) {
+      console.log("No streak count found yet, trying more aggressive approach");
+
+      // Get all elements in the document
+      const allElements = document.querySelectorAll("*");
+
+      // Look for elements that might contain streak information
+      for (const el of allElements) {
+        const text = el.textContent || el.innerText;
+
+        // If the text is short and contains a number and the word "streak", it's likely our streak count
+        if (text && text.length < 50 && text.toLowerCase().includes("streak")) {
+          console.log(`Potential streak element: "${text}"`);
+
+          const matches = text.match(/\d+/g);
+          if (matches && matches.length > 0) {
+            streakCount = parseInt(matches[0], 10);
+            console.log(
+              "Extracted streak count from general search:",
+              streakCount
+            );
+            return streakCount;
+          }
+        }
+      }
+    }
+
+    // If we still couldn't find a streak count, check for any UI elements that might indicate a streak
+    // This is a last resort approach
+    if (!streakCount) {
+      console.log(
+        "Trying last resort approach - looking for any numbers in streak-related UI"
+      );
+
+      // Look for elements with streak-related classes or IDs
+      const streakRelatedElements = document.querySelectorAll(
+        '[class*="streak"], [id*="streak"], [data-*="streak"]'
+      );
+      console.log("Streak-related elements:", streakRelatedElements);
+
+      if (streakRelatedElements.length > 0) {
+        // Check each element and its children for numbers
+        for (const el of streakRelatedElements) {
+          const text = el.textContent || el.innerText;
+          const matches = text.match(/\d+/g);
+
+          if (matches && matches.length > 0) {
+            streakCount = parseInt(matches[0], 10);
+            console.log(
+              "Found streak count in streak-related element:",
+              streakCount
+            );
+            return streakCount;
           }
         }
       }
@@ -514,6 +875,146 @@ function extractStreakCountFromPage() {
   } catch (error) {
     console.error("Error extracting streak count:", error);
     return null;
+  }
+}
+
+/**
+ * Force sync the streak count from daily.dev
+ * This function opens daily.dev in a background tab, extracts the streak count, and then closes the tab
+ */
+function forceSyncStreakFromDailyDev() {
+  try {
+    console.log("Force syncing streak count from daily.dev");
+
+    // Check if we've already maintained the streak today
+    chrome.storage.local.get(["lastVisit"], (result) => {
+      if (chrome.runtime.lastError) {
+        console.error("Error accessing storage:", chrome.runtime.lastError);
+        return;
+      }
+
+      const today = new Date().toDateString();
+      const alreadyMaintained = result.lastVisit === today;
+
+      // Create a new tab with daily.dev
+      chrome.tabs.create({ url: DAILY_DEV_URL, active: false }, (tab) => {
+        if (chrome.runtime.lastError) {
+          console.error("Error creating tab:", chrome.runtime.lastError);
+          return;
+        }
+
+        console.log("Opened daily.dev tab in background for streak sync");
+
+        // Set up a listener to wait for the tab to fully load
+        const tabLoadListener = (tabId, changeInfo, _) => {
+          // Only proceed if this is our tab and it's fully loaded
+          if (tabId === tab.id && changeInfo.status === "complete") {
+            console.log("Daily.dev page loaded for streak sync");
+
+            // Remove this listener as we don't need it anymore
+            chrome.tabs.onUpdated.removeListener(tabLoadListener);
+
+            // Wait a moment for the page to render before extracting the streak count
+            setTimeout(() => {
+              // Extract the streak count
+              chrome.scripting.executeScript(
+                {
+                  target: { tabId: tab.id },
+                  function: extractStreakCountFromPage,
+                },
+                (results) => {
+                  // Close the tab regardless of the result
+                  chrome.tabs.remove(tab.id, () => {
+                    console.log(
+                      "Closed daily.dev tab after streak sync attempt"
+                    );
+                  });
+
+                  if (chrome.runtime.lastError) {
+                    console.error(
+                      "Error executing streak extraction script:",
+                      chrome.runtime.lastError
+                    );
+                    return;
+                  }
+
+                  if (
+                    results &&
+                    results[0] &&
+                    results[0].result &&
+                    !isNaN(results[0].result)
+                  ) {
+                    // Use the extracted streak count
+                    const streakCount = results[0].result;
+                    console.log(
+                      "Successfully extracted streak count from daily.dev:",
+                      streakCount
+                    );
+
+                    // Update the streak count in storage
+                    chrome.storage.local.set(
+                      {
+                        streak: streakCount,
+                        syncedWithDailyDev: true,
+                        lastSyncTime: Date.now(),
+                      },
+                      () => {
+                        if (chrome.runtime.lastError) {
+                          console.error(
+                            "Error updating storage:",
+                            chrome.runtime.lastError
+                          );
+                          return;
+                        }
+
+                        console.log(
+                          "Updated streak count in storage:",
+                          streakCount
+                        );
+
+                        // If we've already maintained the streak today, update the UI
+                        if (alreadyMaintained) {
+                          chrome.storage.local.set({
+                            lastVisit: today,
+                            streakMaintainedToday: true,
+                          });
+                        }
+
+                        // Show a notification about the sync
+                        chrome.notifications.create({
+                          type: "basic",
+                          iconUrl: "../images/icon128.png",
+                          title: "Daily.dev Streak Synced",
+                          message: `Your streak count has been synced with daily.dev: ${streakCount} days.`,
+                          priority: 0,
+                        });
+                      }
+                    );
+                  } else {
+                    console.error(
+                      "Failed to extract streak count from daily.dev"
+                    );
+                  }
+                }
+              );
+            }, 3000); // Wait 3 seconds for the page to fully render
+          }
+        };
+
+        // Add the listener
+        chrome.tabs.onUpdated.addListener(tabLoadListener);
+
+        // Set a timeout to remove the listener and close the tab if something goes wrong
+        setTimeout(() => {
+          chrome.tabs.onUpdated.removeListener(tabLoadListener);
+          chrome.tabs.remove(tab.id, () => {
+            console.log("Closed daily.dev tab after timeout");
+          });
+        }, 30000); // 30 seconds timeout
+      });
+    });
+  } catch (error) {
+    console.error("Error force syncing streak count:", error);
   }
 }
 
@@ -696,7 +1197,17 @@ function formatTime(hour, minute) {
  */
 chrome.alarms.onAlarm.addListener((alarm) => {
   try {
-    // Check if streak has been maintained before taking any action
+    console.log(
+      `Alarm triggered: ${alarm.name} at ${new Date().toLocaleTimeString()}`
+    );
+
+    // Handle force sync alarm separately - this should always run regardless of streak status
+    if (alarm.name === "forceStreakSync") {
+      forceSyncStreakFromDailyDev();
+      return;
+    }
+
+    // For other alarms, check if streak has been maintained before taking any action
     chrome.storage.local.get(["lastVisit"], (result) => {
       if (chrome.runtime.lastError) {
         console.error("Error accessing storage:", chrome.runtime.lastError);

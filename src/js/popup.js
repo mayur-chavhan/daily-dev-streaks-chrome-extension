@@ -87,6 +87,74 @@ function updateStreakDisplay(streakData) {
       }
     }
 
+    // Add a manual sync button
+    const streakEl = document.querySelector(".streak");
+    if (streakEl) {
+      // Check if sync button already exists
+      if (!document.querySelector(".sync-button")) {
+        const syncButton = document.createElement("button");
+        syncButton.className = "btn sync-button";
+        syncButton.textContent = "Sync with daily.dev";
+        syncButton.style.fontSize = "12px";
+        syncButton.style.padding = "5px 10px";
+        syncButton.style.marginTop = "10px";
+        syncButton.style.backgroundColor = "#007bff";
+        syncButton.style.color = "white";
+        syncButton.style.border = "none";
+        syncButton.style.borderRadius = "4px";
+        syncButton.style.cursor = "pointer";
+
+        syncButton.addEventListener("click", () => {
+          try {
+            // Disable the button while syncing
+            syncButton.disabled = true;
+            syncButton.textContent = "Syncing...";
+
+            // Call the background script to force sync
+            chrome.runtime.sendMessage(
+              { action: "forceSyncStreak" },
+              (response) => {
+                if (chrome.runtime.lastError) {
+                  console.error(
+                    "Error sending message:",
+                    chrome.runtime.lastError
+                  );
+                  showError("Could not sync with daily.dev");
+
+                  // Re-enable the button
+                  syncButton.disabled = false;
+                  syncButton.textContent = "Sync with daily.dev";
+                  return;
+                }
+
+                if (response && response.success) {
+                  // Reload the popup to show updated data
+                  setTimeout(() => {
+                    window.location.reload();
+                  }, 1000);
+                } else {
+                  // Re-enable the button
+                  syncButton.disabled = false;
+                  syncButton.textContent = "Sync with daily.dev";
+
+                  showError("Sync failed. Try again later.");
+                }
+              }
+            );
+          } catch (error) {
+            console.error("Error syncing with daily.dev:", error);
+            showError("Could not sync with daily.dev");
+
+            // Re-enable the button
+            syncButton.disabled = false;
+            syncButton.textContent = "Sync with daily.dev";
+          }
+        });
+
+        streakEl.appendChild(syncButton);
+      }
+    }
+
     // Get today's date for comparison
     const today = new Date().toDateString();
     const statusEl = document.getElementById("status-message");
